@@ -354,7 +354,7 @@ RUN tar xvf build/src/gst-plugins-ugly-${GST_VERSION}.tar.xz && \
         -Dmpeg2dec=disabled \
         -Ddvdread=disabled \
         -Da52dec=disabled \
-        -Dx264=disabled \
+        -Dx264=enabled \
         -Dpackage-origin="${PACKAGE_ORIGIN}" \
         --buildtype=${BUILD_TYPE} \
         --prefix=${PREFIX} \
@@ -482,3 +482,15 @@ RUN tar xvf build/src/gst-python-${GST_VERSION}.tar.xz && \
 ENV GI_TYPELIB_PATH=${LIBDIR}/girepository-1.0
 
 ENV PYTHONPATH=${PREFIX}/lib/python3.6/site-packages:${PYTHONPATH}
+
+ARG USERNAME=vscode
+ARG USER_UID=1000
+ARG USER_GID=$USER_UID
+
+# Create the user
+RUN groupadd --gid $USER_GID $USERNAME \
+    && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME
+
+RUN groupmod --gid $USER_GID $USERNAME \
+    && usermod --uid $USER_UID --gid $USER_GID $USERNAME \
+    && chown -R $USER_UID:$USER_GID /home/$USERNAME
