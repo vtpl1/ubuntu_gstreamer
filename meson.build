@@ -14,7 +14,8 @@ gst_req = '>= @0@.@1@.0'.format(gst_version_major, gst_version_minor)
 
 vtpl_gst_sources = [
   'gsttcpclientsrc.c',
-  'gsttcpsrcstats.c'
+  'gsttcpsrcstats.c',
+  'gsttcpplugin.c'
 ]
 
 gst_plugins_base_args = ['-DHAVE_CONFIG_H']
@@ -35,7 +36,7 @@ libsinc = include_directories('gst-libs')
 # libsinc = include_directories('gst_base_dep')
 
 
-library('vtplgstsrc',
+library('gsttcp',
     vtpl_gst_sources,
     c_args : gst_plugins_base_args,
     include_directories: [configinc, libsinc],
