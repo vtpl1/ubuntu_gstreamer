@@ -6,6 +6,7 @@
 #include "gsttcpclientsrc.h"
 #include "gsttcpsrcstats.h"
 #include "gsttcp.h"
+#include <stdio.h>
 
 GST_DEBUG_CATEGORY_STATIC (tcpclientsrc_debug);
 #define GST_CAT_DEFAULT tcpclientsrc_debug
@@ -30,7 +31,7 @@ enum
 };
 
 #define gst_tcp_client_src_parent_class parent_class
-G_DEFINE_TYPE (GstTCPClientSrc, gst_tcp_client_src, GST_TYPE_PUSH_SRC);
+G_DEFINE_TYPE (GstVTPLTCPClientSrc, gst_tcp_client_src, GST_TYPE_PUSH_SRC);
 
 
 static void gst_tcp_client_src_finalize (GObject * gobject);
@@ -49,10 +50,10 @@ static void gst_tcp_client_src_set_property (GObject * object, guint prop_id,
     const GValue * value, GParamSpec * pspec);
 static void gst_tcp_client_src_get_property (GObject * object, guint prop_id,
     GValue * value, GParamSpec * pspec);
-static GstStructure *gst_tcp_client_src_get_stats (GstTCPClientSrc * src);
+static GstStructure *gst_tcp_client_src_get_stats (GstVTPLTCPClientSrc * src);
 
 static void
-gst_tcp_client_src_class_init (GstTCPClientSrcClass * klass)
+gst_tcp_client_src_class_init (GstVTPLTCPClientSrcClass * klass)
 {
   GObjectClass *gobject_class;
   GstElementClass *gstelement_class;
@@ -78,7 +79,7 @@ gst_tcp_client_src_class_init (GstTCPClientSrcClass * klass)
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   /**
-   * GstTCPClientSrc::timeout;
+   * GstVTPLTCPClientSrc::timeout;
    *
    * Value in seconds to timeout a blocking I/O (0 = No timeout).
    *
@@ -91,7 +92,7 @@ gst_tcp_client_src_class_init (GstTCPClientSrcClass * klass)
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   /**
-   * GstTCPClientSrc::stats:
+   * GstVTPLTCPClientSrc::stats:
    *
    * Sends a GstStructure with statistics. We count bytes-received in a
    * platform-independent way and the rest via the tcp_info struct, if it's
@@ -134,7 +135,7 @@ gst_tcp_client_src_class_init (GstTCPClientSrcClass * klass)
 }
 
 static void
-gst_tcp_client_src_init (GstTCPClientSrc * this)
+gst_tcp_client_src_init (GstVTPLTCPClientSrc * this)
 {
   this->port = TCP_DEFAULT_PORT;
   this->host = g_strdup (TCP_DEFAULT_HOST);
@@ -142,13 +143,13 @@ gst_tcp_client_src_init (GstTCPClientSrc * this)
   this->socket = NULL;
   this->cancellable = g_cancellable_new ();
 
-  GST_OBJECT_FLAG_UNSET (this, GST_TCP_CLIENT_SRC_OPEN);
+  GST_OBJECT_FLAG_UNSET (this, GST_VTPL_TCP_CLIENT_SRC_OPEN);
 }
 
 static void
 gst_tcp_client_src_finalize (GObject * gobject)
 {
-  GstTCPClientSrc *this = GST_TCP_CLIENT_SRC (gobject);
+  GstVTPLTCPClientSrc *this = GST_VTPL_TCP_CLIENT_SRC (gobject);
 
   if (this->cancellable)
     g_object_unref (this->cancellable);
@@ -166,10 +167,10 @@ gst_tcp_client_src_finalize (GObject * gobject)
 static GstCaps *
 gst_tcp_client_src_getcaps (GstBaseSrc * bsrc, GstCaps * filter)
 {
-  GstTCPClientSrc *src;
+  GstVTPLTCPClientSrc *src;
   GstCaps *caps = NULL;
 
-  src = GST_TCP_CLIENT_SRC (bsrc);
+  src = GST_VTPL_TCP_CLIENT_SRC (bsrc);
 
   caps = (filter ? gst_caps_ref (filter) : gst_caps_new_any ());
 
@@ -181,16 +182,16 @@ gst_tcp_client_src_getcaps (GstBaseSrc * bsrc, GstCaps * filter)
 static GstFlowReturn
 gst_tcp_client_src_create (GstPushSrc * psrc, GstBuffer ** outbuf)
 {
-  GstTCPClientSrc *src;
+  GstVTPLTCPClientSrc *src;
   GstFlowReturn ret = GST_FLOW_OK;
   gssize rret;
   GError *err = NULL;
   GstMapInfo map;
   gssize avail, read;
 
-  src = GST_TCP_CLIENT_SRC (psrc);
+  src = GST_VTPL_TCP_CLIENT_SRC (psrc);
 
-  if (!GST_OBJECT_FLAG_IS_SET (src, GST_TCP_CLIENT_SRC_OPEN))
+  if (!GST_OBJECT_FLAG_IS_SET (src, GST_VTPL_TCP_CLIENT_SRC_OPEN))
     goto wrong_state;
 
   GST_LOG_OBJECT (src, "asked for a buffer");
@@ -228,6 +229,7 @@ gst_tcp_client_src_create (GstPushSrc * psrc, GstBuffer ** outbuf)
   }
 
   if (avail > 0) {
+    GST_DEBUG_OBJECT (src, "MONOTOSH all well");
     read = MIN (avail, MAX_READ_SIZE);
     *outbuf = gst_buffer_new_and_alloc (read);
     gst_buffer_map (*outbuf, &map, GST_MAP_READWRITE);
@@ -266,7 +268,7 @@ gst_tcp_client_src_create (GstPushSrc * psrc, GstBuffer ** outbuf)
     gst_buffer_unmap (*outbuf, &map);
     gst_buffer_resize (*outbuf, 0, rret);
     src->bytes_received += read;
-
+    printf("MONOTOSH %ld\r\n", src->bytes_received);
     GST_LOG_OBJECT (src,
         "Returning buffer from _get of size %" G_GSIZE_FORMAT ", ts %"
         GST_TIME_FORMAT ", dur %" GST_TIME_FORMAT
@@ -311,7 +313,7 @@ static void
 gst_tcp_client_src_set_property (GObject * object, guint prop_id,
     const GValue * value, GParamSpec * pspec)
 {
-  GstTCPClientSrc *tcpclientsrc = GST_TCP_CLIENT_SRC (object);
+  GstVTPLTCPClientSrc *tcpclientsrc = GST_VTPL_TCP_CLIENT_SRC (object);
 
   switch (prop_id) {
     case PROP_HOST:
@@ -339,7 +341,7 @@ static void
 gst_tcp_client_src_get_property (GObject * object, guint prop_id,
     GValue * value, GParamSpec * pspec)
 {
-  GstTCPClientSrc *tcpclientsrc = GST_TCP_CLIENT_SRC (object);
+  GstVTPLTCPClientSrc *tcpclientsrc = GST_VTPL_TCP_CLIENT_SRC (object);
 
   switch (prop_id) {
     case PROP_HOST:
@@ -364,7 +366,7 @@ gst_tcp_client_src_get_property (GObject * object, guint prop_id,
 static gboolean
 gst_tcp_client_src_start (GstBaseSrc * bsrc)
 {
-  GstTCPClientSrc *src = GST_TCP_CLIENT_SRC (bsrc);
+  GstVTPLTCPClientSrc *src = GST_VTPL_TCP_CLIENT_SRC (bsrc);
   GError *err = NULL;
   GInetAddress *addr;
   GSocketAddress *saddr;
@@ -414,7 +416,7 @@ gst_tcp_client_src_start (GstBaseSrc * bsrc)
   g_socket_set_timeout (src->socket, src->timeout);
 
   GST_DEBUG_OBJECT (src, "opened receiving client socket");
-  GST_OBJECT_FLAG_SET (src, GST_TCP_CLIENT_SRC_OPEN);
+  GST_OBJECT_FLAG_SET (src, GST_VTPL_TCP_CLIENT_SRC_OPEN);
 
   /* connect to server */
   if (!g_socket_connect (src->socket, saddr, src->cancellable, &err))
@@ -466,10 +468,10 @@ connect_failed:
 static gboolean
 gst_tcp_client_src_stop (GstBaseSrc * bsrc)
 {
-  GstTCPClientSrc *src;
+  GstVTPLTCPClientSrc *src;
   GError *err = NULL;
 
-  src = GST_TCP_CLIENT_SRC (bsrc);
+  src = GST_VTPL_TCP_CLIENT_SRC (bsrc);
 
   if (src->socket) {
     GST_DEBUG_OBJECT (src, "closing socket");
@@ -484,7 +486,7 @@ gst_tcp_client_src_stop (GstBaseSrc * bsrc)
     src->socket = NULL;
   }
 
-  GST_OBJECT_FLAG_UNSET (src, GST_TCP_CLIENT_SRC_OPEN);
+  GST_OBJECT_FLAG_UNSET (src, GST_VTPL_TCP_CLIENT_SRC_OPEN);
 
   return TRUE;
 }
@@ -493,7 +495,7 @@ gst_tcp_client_src_stop (GstBaseSrc * bsrc)
 static gboolean
 gst_tcp_client_src_unlock (GstBaseSrc * bsrc)
 {
-  GstTCPClientSrc *src = GST_TCP_CLIENT_SRC (bsrc);
+  GstVTPLTCPClientSrc *src = GST_VTPL_TCP_CLIENT_SRC (bsrc);
 
   GST_DEBUG_OBJECT (src, "set to flushing");
   g_cancellable_cancel (src->cancellable);
@@ -505,7 +507,7 @@ gst_tcp_client_src_unlock (GstBaseSrc * bsrc)
 static gboolean
 gst_tcp_client_src_unlock_stop (GstBaseSrc * bsrc)
 {
-  GstTCPClientSrc *src = GST_TCP_CLIENT_SRC (bsrc);
+  GstVTPLTCPClientSrc *src = GST_VTPL_TCP_CLIENT_SRC (bsrc);
 
   GST_DEBUG_OBJECT (src, "unset flushing");
   g_object_unref (src->cancellable);
@@ -515,15 +517,16 @@ gst_tcp_client_src_unlock_stop (GstBaseSrc * bsrc)
 }
 
 static GstStructure *
-gst_tcp_client_src_get_stats (GstTCPClientSrc * src)
+gst_tcp_client_src_get_stats (GstVTPLTCPClientSrc * src)
 {
   GstStructure *s;
-
+  printf("+++++++++++++MONOTOSH++++++++");
+  GST_ERROR ("----------MONOTOSH---------");
   /* we can't get the values post stop so just return the saved ones */
   if (src->stats)
     return gst_structure_copy (src->stats);
 
-  s = gst_structure_new ("GstTCPClientSrcStats",
+  s = gst_structure_new ("GstVTPLTCPClientSrcStats",
       "bytes-received", G_TYPE_UINT64, src->bytes_received, NULL);
 
   gst_tcp_stats_from_socket (s, src->socket);
