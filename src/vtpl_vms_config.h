@@ -1,0 +1,4 @@
+#define VMS_DEFAULT_PORT 3003
+#define VMS_HIGHEST_PORT 65535
+#define VMS_DEFAULT_HOST  "localhost"
+#define VMS_DEFAULT_TIMEOUT 0

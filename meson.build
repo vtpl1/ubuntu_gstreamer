@@ -1,4 +1,4 @@
-project('vtpl-gst-source-element', 'c',
+project('gst-vtpl-vms-source-element', 'c',
   version : '1.15.0.0',
   meson_version : '>= 0.54',
   default_options : [ 'warning_level=1',
@@ -12,10 +12,12 @@ gst_version_micro = version_arr[2].to_int()
 
 gst_req = '>= @0@.@1@.0'.format(gst_version_major, gst_version_minor)
 
-vtpl_gst_sources = [
-  'gsttcpclientsrc.c',
+gst_vtpl_sources = [
+  # 'gsttcpclientsrc.c',
   'gsttcpsrcstats.c',
-  'gsttcpplugin.c'
+  # 'gsttcpplugin.c',
+  'src/gst_vtpl_vms_plugin.c',
+  'src/gst_vtpl_vms_src.c'
 ]
 
 gst_plugins_base_args = ['-DHAVE_CONFIG_H']
@@ -30,14 +32,14 @@ gst_net_dep = dependency('gstreamer-net-1.0', version : gst_req,
   fallback : ['gstreamer', 'gst_net_dep'])
 
 subdir('gst-libs')
-configinc = include_directories('.')
+configinc = include_directories('.', './src')
 libsinc = include_directories('gst-libs')
 # 'Monotosh' +  gst_base_dep
 # libsinc = include_directories('gst_base_dep')
 
 
-library('gstvtpltcp',
-    vtpl_gst_sources,
+library('vtpl',
+    gst_vtpl_sources,
     c_args : gst_plugins_base_args,
     include_directories: [configinc, libsinc],
     dependencies : [gio_dep, gst_base_dep, gst_net_dep]
