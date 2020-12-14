@@ -483,6 +483,8 @@ ENV GI_TYPELIB_PATH=${LIBDIR}/girepository-1.0
 
 ENV PYTHONPATH=${PREFIX}/lib/python3.6/site-packages:${PYTHONPATH}
 
+RUN pip3 install bump2version
+
 ARG USERNAME=vscode
 ARG USER_UID=1000
 ARG USER_GID=$USER_UID

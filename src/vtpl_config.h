@@ -1,5 +1,5 @@
-#define VTPL_VERSION "1.16.2"
+#define VTPL_VERSION "0.0.0"
 #define VTPL_DESCRIPTION "Communicate with Vtpl Vms"
-#define VTPL_LICENSE "LGPL"
+#define VTPL_LICENSE "Proprietary"
 #define VTPL_PACKAGE_NAME "Vtpl VMS plugins"
 #define VTPL_PACKAGE_ORIGIN "https://videonetics.com"
