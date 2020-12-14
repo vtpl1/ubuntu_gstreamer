@@ -23,6 +23,8 @@ enum {
   PROP_TIMEOUT,
   PROP_STATS,
 };
+// http://192.168.1.250:8181/!/#VMS2_5/view/head/devbranch/IVMSCommonPackages/V-Media-Manager/src/com/videonetics/stream/client/VLiveClient.java
+// http://192.168.1.250:8181/!/#VMS2_5/view/head/devbranch/DEVELOPMENT_IVMS/1.3.0.5/V-Smart-Models/src/com/videonetics/model/output/VFrame.java
 
 #define gst_vtpl_vms_src_parent_class parent_class
 G_DEFINE_TYPE(GstVtplVmsSrc, gst_vtpl_vms_src, GST_TYPE_PUSH_SRC);
@@ -198,8 +200,6 @@ static void gst_vtpl_vms_src_finalize(GObject *gobject) {
 
 static GstStructure *gst_vtpl_vms_src_get_stats(GstVtplVmsSrc *this) {
   GstStructure *s;
-  printf("+++++++++++++MONOTOSH++++++++");
-  GST_ERROR("----------MONOTOSH---------");
   /* we can't get the values post stop so just return the saved ones */
   if (this->stats) return gst_structure_copy(this->stats);
 
@@ -283,10 +283,26 @@ static GstFlowReturn gst_vtpl_vms_src_create(GstPushSrc *psrc,
     gst_buffer_unref(*outbuf);
     *outbuf = NULL;
   } else {
+    ret = GST_FLOW_OK;
+    gst_buffer_unmap(*outbuf, &map);
+    gst_buffer_resize(*outbuf, 0, rret);
+    this->bytes_received += read;
+    GST_LOG_OBJECT(this,
+                   "Returning buffer from _get of size %" G_GSIZE_FORMAT
+                   ", avail %" G_GSIZE_FORMAT ", read %" G_GSIZE_FORMAT
+                   ", rret %" G_GSIZE_FORMAT ", ts %" GST_TIME_FORMAT
+                   ", dur %" GST_TIME_FORMAT ", offset %" G_GINT64_FORMAT
+                   ", offset_end %" G_GINT64_FORMAT,
+                   gst_buffer_get_size(*outbuf), avail, read, rret,
+                   GST_TIME_ARGS(GST_BUFFER_TIMESTAMP(*outbuf)),
+                   GST_TIME_ARGS(GST_BUFFER_DURATION(*outbuf)),
+                   GST_BUFFER_OFFSET(*outbuf), GST_BUFFER_OFFSET_END(*outbuf));
   }
   g_clear_error(&err);
+
 done:
   return ret;
+
 select_error : {
   if (g_error_matches(err, G_IO_ERROR, G_IO_ERROR_CANCELLED)) {
     GST_DEBUG_OBJECT(this, "Cancelled");
@@ -299,11 +315,13 @@ select_error : {
   g_clear_error(&err);
   return ret;
 }
+
 get_available_error : {
   GST_ELEMENT_ERROR(this, RESOURCE, READ, (NULL),
                     ("Failed to get available bytes from socket"));
   return GST_FLOW_ERROR;
 }
+
 wrong_state : {
   GST_DEBUG_OBJECT(this, "connection closed, cannot read data");
   return GST_FLOW_FLUSHING;
@@ -321,7 +339,130 @@ static GstCaps *gst_vtpl_vms_src_getcaps(GstBaseSrc *bsrc, GstCaps *filter) {
   return caps;
 }
 
-static gboolean gst_vtpl_vms_src_stop(GstBaseSrc *bsrc) { return FALSE; }
-static gboolean gst_vtpl_vms_src_start(GstBaseSrc *bsrc) { return FALSE; }
-static gboolean gst_vtpl_vms_src_unlock(GstBaseSrc *bsrc) { return FALSE; }
-static gboolean gst_vtpl_vms_src_unlock_stop(GstBaseSrc *bsrc) { return FALSE; }
+/* create a socket for connecting to remote server */
+static gboolean gst_vtpl_vms_src_start(GstBaseSrc *bsrc) {
+  GstVtplVmsSrc *this = GST_VTPL_VMS_SRC(bsrc);
+  GError *err = NULL;
+  GInetAddress *addr;
+  GSocketAddress *saddr;
+  GResolver *resolver;
+  this->bytes_received = 0;
+  gst_clear_structure(&this->stats);
+
+  /* look up name if we need to */
+  addr = g_inet_address_new_from_string(this->host);
+  if (!addr) {
+    GList *results;
+
+    resolver = g_resolver_get_default();
+
+    results = g_resolver_lookup_by_name(resolver, this->host, this->cancellable,
+                                        &err);
+    if (!results) goto name_resolve;
+    addr = G_INET_ADDRESS(g_object_ref(results->data));
+    g_resolver_free_addresses(results);
+    g_object_unref(resolver);
+  }
+#ifndef GST_DISABLE_GST_DEBUG
+  {
+    gchar *ip = g_inet_address_to_string(addr);
+
+    GST_DEBUG_OBJECT(this, "IP address for host %s is %s", this->host, ip);
+    g_free(ip);
+  }
+#endif
+  saddr = g_inet_socket_address_new(addr, this->port);
+  g_object_unref(addr);
+  /* create receiving client socket */
+  GST_DEBUG_OBJECT(this, "opening receiving client socket to %s:%d", this->host,
+                   this->port);
+
+  this->socket =
+      g_socket_new(g_socket_address_get_family(saddr), G_SOCKET_TYPE_STREAM,
+                   G_SOCKET_PROTOCOL_TCP, &err);
+  if (!this->socket) goto no_socket;
+
+  g_socket_set_timeout(this->socket, this->timeout);
+  GST_DEBUG_OBJECT(this, "opened receiving client socket");
+  GST_OBJECT_FLAG_SET(this, GST_VTPL_VMS_SRC_OPEN);
+
+  /* connect to server */
+  if (!g_socket_connect(this->socket, saddr, this->cancellable, &err))
+    goto connect_failed;
+
+  g_object_unref(saddr);
+
+  return TRUE;
+no_socket : {
+  GST_ELEMENT_ERROR(this, RESOURCE, OPEN_READ, (NULL),
+                    ("Failed to create socket: %s", err->message));
+  g_clear_error(&err);
+  g_object_unref(saddr);
+  return FALSE;
+}
+name_resolve : {
+  if (g_error_matches(err, G_IO_ERROR, G_IO_ERROR_CANCELLED)) {
+    GST_DEBUG_OBJECT(this, "Cancelled name resolver");
+  } else {
+    GST_ELEMENT_ERROR(
+        this, RESOURCE, OPEN_READ, (NULL),
+        ("Failed to resolve host '%s': %s", this->host, err->message));
+  }
+  g_clear_error(&err);
+  g_object_unref(resolver);
+  return FALSE;
+}
+connect_failed : {
+  if (g_error_matches(err, G_IO_ERROR, G_IO_ERROR_CANCELLED)) {
+    GST_DEBUG_OBJECT(this, "Cancelled connecting");
+  } else {
+    GST_ELEMENT_ERROR(this, RESOURCE, OPEN_READ, (NULL),
+                      ("Failed to connect to host '%s:%d': %s", this->host,
+                       this->port, err->message));
+  }
+  g_clear_error(&err);
+  g_object_unref(saddr);
+  gst_vtpl_vms_src_stop(GST_BASE_SRC(this));
+  return FALSE;
+}
+}
+
+static gboolean gst_vtpl_vms_src_stop(GstBaseSrc *bsrc) {
+  GstVtplVmsSrc *this = GST_VTPL_VMS_SRC(bsrc);
+  GError *err = NULL;
+  if (this->socket) {
+    GST_DEBUG_OBJECT(this, "closing socket");
+
+    this->stats = gst_vtpl_vms_src_get_stats(this);
+
+    if (!g_socket_close(this->socket, &err)) {
+      GST_ERROR_OBJECT(this, "Failed to close socket: %s", err->message);
+      g_clear_error(&err);
+    }
+    g_object_unref(this->socket);
+    this->socket = NULL;
+  }
+
+  GST_OBJECT_FLAG_UNSET(this, GST_VTPL_VMS_SRC_OPEN);
+
+  return TRUE;
+}
+
+/* will be called only between calls to start() and stop() */
+static gboolean gst_vtpl_vms_src_unlock(GstBaseSrc *bsrc) {
+  GstVtplVmsSrc *this = GST_VTPL_VMS_SRC(bsrc);
+  GST_DEBUG_OBJECT(this, "set to flushing");
+  g_cancellable_cancel(this->cancellable);
+
+  return TRUE;
+}
+
+/* will be called only between calls to start() and stop() */
+static gboolean gst_vtpl_vms_src_unlock_stop(GstBaseSrc *bsrc) {
+  GstVtplVmsSrc *this = GST_VTPL_VMS_SRC(bsrc);
+  GST_DEBUG_OBJECT(this, "unset flushing");
+  g_object_unref(this->cancellable);
+  this->cancellable = g_cancellable_new();
+
+  return TRUE;
+}

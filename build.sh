@@ -2,7 +2,7 @@
 meson setup --wipe builddir
 #meson setup builddir
 cd builddir
-bump2version patch
+#bump2version patch
 meson compile
 
 rm /home/vscode/.cache/gstreamer-1.0/registry.x86_64.bin
