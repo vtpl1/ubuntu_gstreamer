@@ -48,7 +48,7 @@ struct _GstVtplVmsSrcClass {
   GstPushSrcClass parent_class;
 };
 
-GType gst_tcp_client_src_get_type(void);
+GType gst_vtpl_vms_src_get_type(void);
 
 G_END_DECLS
 

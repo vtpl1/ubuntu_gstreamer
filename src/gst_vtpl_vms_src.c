@@ -263,27 +263,26 @@ static GstFlowReturn gst_vtpl_vms_src_create(GstPushSrc *psrc,
     rret = 0;
   }
   if (rret == 0) {
-    GST_DEBUG_OBJECT (this, "Connection closed");
+    GST_DEBUG_OBJECT(this, "Connection closed");
     ret = GST_FLOW_EOS;
     if (*outbuf) {
-      gst_buffer_unmap (*outbuf, &map);
-      gst_buffer_unref (*outbuf);
+      gst_buffer_unmap(*outbuf, &map);
+      gst_buffer_unref(*outbuf);
     }
     *outbuf = NULL;
   } else if (rret < 0) {
-    if (g_error_matches (err, G_IO_ERROR, G_IO_ERROR_CANCELLED)) {
+    if (g_error_matches(err, G_IO_ERROR, G_IO_ERROR_CANCELLED)) {
       ret = GST_FLOW_FLUSHING;
-      GST_DEBUG_OBJECT (this, "Cancelled reading from socket");
+      GST_DEBUG_OBJECT(this, "Cancelled reading from socket");
     } else {
       ret = GST_FLOW_ERROR;
-      GST_ELEMENT_ERROR (this, RESOURCE, READ, (NULL),
-          ("Failed to read from socket: %s", err->message));
+      GST_ELEMENT_ERROR(this, RESOURCE, READ, (NULL),
+                        ("Failed to read from socket: %s", err->message));
     }
-    gst_buffer_unmap (*outbuf, &map);
-    gst_buffer_unref (*outbuf);
+    gst_buffer_unmap(*outbuf, &map);
+    gst_buffer_unref(*outbuf);
     *outbuf = NULL;
   } else {
-
   }
   g_clear_error(&err);
 done:
@@ -317,12 +316,12 @@ static GstCaps *gst_vtpl_vms_src_getcaps(GstBaseSrc *bsrc, GstCaps *filter) {
   this = GST_VTPL_VMS_SRC(bsrc);
 
   caps = (filter ? gst_caps_ref(filter) : gst_caps_new_any());
-  GST_DEBUG_OBJECT(this, "returning caps %", GST_PTR_FORMAT, caps);
+  GST_DEBUG_OBJECT(this, "returning caps %" GST_PTR_FORMAT, caps);
   g_assert(GST_IS_CAPS(caps));
   return caps;
 }
 
-static gboolean gst_vtpl_vms_src_stop(GstBaseSrc *bsrc) {}
-static gboolean gst_vtpl_vms_src_start(GstBaseSrc *bsrc) {}
-static gboolean gst_vtpl_vms_src_unlock(GstBaseSrc *bsrc) {}
-static gboolean gst_vtpl_vms_src_unlock_stop(GstBaseSrc *bsrc) {}
+static gboolean gst_vtpl_vms_src_stop(GstBaseSrc *bsrc) { return FALSE; }
+static gboolean gst_vtpl_vms_src_start(GstBaseSrc *bsrc) { return FALSE; }
+static gboolean gst_vtpl_vms_src_unlock(GstBaseSrc *bsrc) { return FALSE; }
+static gboolean gst_vtpl_vms_src_unlock_stop(GstBaseSrc *bsrc) { return FALSE; }

@@ -13,11 +13,17 @@ gst_version_micro = version_arr[2].to_int()
 gst_req = '>= @0@.@1@.0'.format(gst_version_major, gst_version_minor)
 
 gst_vtpl_sources = [
+  'gsttcpclientsrc.c',
+  'gsttcpsrcstats.c',
+  'gsttcpplugin.c',
+]
+
+gst_vtpl_vms_sources = [
   # 'gsttcpclientsrc.c',
+  'src/gst_vtpl_vms_src.c',
   'gsttcpsrcstats.c',
   # 'gsttcpplugin.c',
-  'src/gst_vtpl_vms_plugin.c',
-  'src/gst_vtpl_vms_src.c'
+  'src/gst_vtpl_vms_plugin.c'
 ]
 
 gst_plugins_base_args = ['-DHAVE_CONFIG_H']
@@ -38,8 +44,15 @@ libsinc = include_directories('gst-libs')
 # libsinc = include_directories('gst_base_dep')
 
 
-library('vtpl',
+library('gstvtpltcp',
     gst_vtpl_sources,
+    c_args : gst_plugins_base_args,
+    include_directories: [configinc, libsinc],
+    dependencies : [gio_dep, gst_base_dep, gst_net_dep]
+)
+
+library('vtpl',
+    gst_vtpl_vms_sources,
     c_args : gst_plugins_base_args,
     include_directories: [configinc, libsinc],
     dependencies : [gio_dep, gst_base_dep, gst_net_dep]
