@@ -390,6 +390,8 @@ static gboolean gst_vtpl_vms_src_start(GstBaseSrc *bsrc) {
   if (!g_socket_connect(this->socket, saddr, this->cancellable, &err))
     goto connect_failed;
 
+  if (g_socket_send(this->socket, ))
+
   g_object_unref(saddr);
 
   return TRUE;

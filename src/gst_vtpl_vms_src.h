@@ -48,6 +48,16 @@ struct _GstVtplVmsSrcClass {
   GstPushSrcClass parent_class;
 };
 
+#pragma pack(1)
+typedef struct _VtplVmsRequestHeader {
+  guint32 device_id;
+  guint16 channel_id;
+  guchar stream_type;
+  guchar val1;
+  guchar val2; 
+} VtplVmsRequestHeader;
+
+
 GType gst_vtpl_vms_src_get_type(void);
 
 G_END_DECLS
